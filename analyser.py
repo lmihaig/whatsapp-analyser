@@ -1,3 +1,5 @@
+import re
+import emoji
 import dash
 from dash import dcc, html
 from dash.dependencies import Output, Input, State
@@ -44,10 +46,18 @@ def build_df(chat):
             content.append(text.split(":")[2])
         except IndexError:
             content.append("Missing Text")
+            name[-1] = "System Message"
 
     df = pd.DataFrame(list(zip(date_list, time, name, content)),
                       columns=["Date", "Time", "Name", "Content"])
-    return df
+
+    df_system = pd.DataFrame(columns=df.columns)
+    cond = df.Name == "System Message"
+    rows = df.loc[cond, :]
+    df_system = df_system.append(rows, ignore_index=True)
+    df.drop(rows.index, inplace=True)
+
+    return df, df_system
 
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.SUPERHERO], meta_tags=[
@@ -89,28 +99,28 @@ app.layout = dbc.Container(fluid=True, children=[
         ], width=3),
         dbc.Col([
             dbc.Card([
-                dbc.CardHeader("TEST", style={
+                dbc.CardHeader("TOTAL EMOJIS", style={
                                "textAlign": "center"}),
                 dbc.CardBody([
-                    html.H2("test")
+                    html.H2(id="total-emojis")
                 ], style={"textAlign": "center"})
             ])
         ], width=3),
         dbc.Col([
             dbc.Card([
-                dbc.CardHeader("TEST", style={
+                dbc.CardHeader("TOTAL LINKS", style={
                                "textAlign": "center"}),
                 dbc.CardBody([
-                    html.H2("test")
+                    html.H2(id="total-links")
                 ], style={"textAlign": "center"})
             ])
         ], width=3),
         dbc.Col([
             dbc.Card([
-                dbc.CardHeader("TEST", style={
+                dbc.CardHeader("TOTAL MEDIA", style={
                                "textAlign": "center"}),
                 dbc.CardBody([
-                    html.H2("test")
+                    html.H2(id="total-media")
                 ], style={"textAlign": "center"})
             ])
         ], width=3)
@@ -118,28 +128,28 @@ app.layout = dbc.Container(fluid=True, children=[
     dbc.Row([
         dbc.Col([
             dbc.Card([
-                dbc.CardHeader("TEST", style={
+                dbc.CardHeader("TOTAL CHATTERS", style={
                                "textAlign": "center"}),
                 dbc.CardBody([
-                    html.H2("test")
+                    html.H2(id="total-chatters")
                 ], style={"textAlign": "center"})
             ])
         ], width=3),
         dbc.Col([
             dbc.Card([
-                dbc.CardHeader("TEST", style={
+                dbc.CardHeader("MOST USED EMOJI", style={
                                "textAlign": "center"}),
                 dbc.CardBody([
-                    html.H2("test")
+                    html.H2(id="most-used-emoji")
                 ], style={"textAlign": "center"})
             ])
         ], width=3),
         dbc.Col([
             dbc.Card([
-                dbc.CardHeader("TEST", style={
+                dbc.CardHeader("PERSON WITH MOST MESSAGES", style={
                                "textAlign": "center"}),
                 dbc.CardBody([
-                    html.H2("test")
+                    html.H2(id="most-messages")
                 ], style={"textAlign": "center"})
             ])
         ], width=3),
@@ -188,8 +198,11 @@ app.layout = dbc.Container(fluid=True, children=[
 ])
 
 
-@app.callback(
+@ app.callback(
     Output("total-messages", "children"),
+    Output("total-chatters", "children"),
+    Output("total-emojis", "children"),
+    Output("word-cloud", "figure"),
     Input("upload-chat", "contents"),
     State("upload-chat", "filename"),
     State("upload-chat", "last_modified")
@@ -201,15 +214,34 @@ def update_info_cards(contents, filename, last_modified):
         if "txt" in filename:
             chat = decoded_text.splitlines()
             chat = clearchat(chat)
-            df = build_df(chat)
+            df, df_system = build_df(chat)
     except Exception as e:
         print(e)
         return html.Div([
             'There was an error processing this file.'
         ])
+
     df_c = df.copy()
+
     total_messages = len(df_c)
-    return total_messages
+
+    total_chatters = len(df_c["Name"].unique())
+    print(df_c.Content.astype(str))
+    # figure = px.line(df_c, x=
+    # slow as fuck 6-7s
+    # it's actually total messages that have emojis (meaning a message like "👽👽👽👽😂👽" would only count as 1)
+    # come back to this later, don't forget to return the right thing
+    # emojilist = df_c["Content"].str.extract(emoji.get_emoji_regexp()).dropna()
+
+    wordcloud = WordCloud(background_color="white", min_word_length=4, width=800, height=400).generate(
+        " ".join(df_c.Content.astype(str)))
+    fig_wordcloud = px.imshow(
+        wordcloud, template="ggplot2", title="Messages Wordcloud")
+    fig_wordcloud.update_layout(margin=dict(l=20, r=20, t=30, b=20))
+    fig_wordcloud.update_xaxes(visible=False)
+    fig_wordcloud.update_yaxes(visible=False)
+
+    return total_messages, total_chatters, 1, fig_wordcloud
 
 
 if __name__ == "__main__":
