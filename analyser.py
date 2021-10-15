@@ -2,6 +2,7 @@ import re
 from datetime import date
 from base64 import b64decode, b64encode
 import dash
+from dash.exceptions import PreventUpdate
 from dash.html.Div import Div
 import diskcache
 from dash import dcc, html, dash_table
@@ -66,7 +67,7 @@ def build_df(chat):
     df.drop(rows.index, inplace=True)
 
     df_links = pd.DataFrame(columns=df.columns)
-    # sorry if someone was having a discussion about https or http
+    """ sorry if someone was having a discussion about https or http """
     rows = df[df["Content"].astype(str).str.contains("https|http")]
     df_links = df_links.append(rows, ignore_index=True)
     df.drop(rows.index, inplace=True)
@@ -75,10 +76,10 @@ def build_df(chat):
     return df, df_system, df_media, df_links
 
 
-# DARKLY, SLATE, SUPERHERO
+""" still deciding on DARKLY, SLATE, SUPERHERO """
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY], meta_tags=[
     {"name": "viewport", "content": "width=device-width, initial-scale=1.0"}])
-
+app.title = "WhatsApp Chat Analyser by lmihaig"
 app.layout = dbc.Container(fluid=True, children=[
     dbc.Row([
         dbc.Col([
@@ -86,7 +87,7 @@ app.layout = dbc.Container(fluid=True, children=[
                 dbc.CardBody([
                     dbc.CardLink("WhatsApp Chat Analyser by lmihaig", target="_blank",
                                  href="https://github.com/lmihaig/whatsapp-analyser")
-                ],  className='align-self-center')
+                ],  className="align-self-center")
             ])
         ], width=2),
         dbc.Col([
@@ -94,8 +95,8 @@ app.layout = dbc.Container(fluid=True, children=[
         ], width=1),
         dbc.Col([
             dcc.Upload([
-                'Drag and Drop or ',
-                html.A('Select a File')], className="align-items-center", id="upload-chat",
+                "Drag and Drop or ",
+                html.A("Select a File")], className="align-items-center", id="upload-chat",
                 style={
                 "display": "inline-block",
                 "text-align": "center",
@@ -111,13 +112,13 @@ app.layout = dbc.Container(fluid=True, children=[
                 "border": "1px",
                 "cursor": "pointer",
                 "box-sizing": "border-box",
-                'width': '95%',
-                'height': '60px',
-                'lineHeight': '60px',
-                'borderWidth': '1px',
-                'borderStyle': 'dashed',
-                'borderRadius': '5px',
-                'textAlign': 'center',
+                "width": "95%",
+                "height": "60px",
+                "lineHeight": "60px",
+                "borderWidth": "1px",
+                "borderStyle": "dashed",
+                "borderRadius": "5px",
+                "textAlign": "center",
             })])
     ], className="mt-2 mb-2"),
     dbc.Row([
@@ -125,7 +126,7 @@ app.layout = dbc.Container(fluid=True, children=[
             dbc.Input(id="queryword", placeholder="Word to search for"),
         ]),
         dbc.Col([
-            dbc.Button('Analyse', id='submit-val', n_clicks=0, block=True,
+            dbc.Button("Analyse", id="submit-val", n_clicks=0, block=True,
                        style={
                            "color":  "#00BC8C",
                            "border-style": "solid",
@@ -137,8 +138,11 @@ app.layout = dbc.Container(fluid=True, children=[
     ], className="mt-2 mb-2"),
 
     dcc.Store(id="dataframe"),
-
+    html.Div([],
+             id="query-results", style={"display": "none"}),
     html.Div([
+        html.H2("Cards and Graphs"),
+        html.Hr(),
         dbc.Row([
             dbc.Col([
                 dbc.Card([
@@ -247,10 +251,8 @@ app.layout = dbc.Container(fluid=True, children=[
                 ])
             ], width=6),
         ], className="mb-2")
-    ], id="cards-and-graphs", style={"display": "none"}),
+    ], id="cards-and-graphs", style={"display": "none"})
 
-    html.Div([],
-             id="query-results", style={"display": "none"})
 ])
 
 
@@ -272,106 +274,132 @@ app.layout = dbc.Container(fluid=True, children=[
     Input("submit-val", "n_clicks"),
     State("upload-chat", "contents"),
     State("upload-chat", "filename"),
+    State("total-messages", "children")
 )
-def update_cards(click, contents, filename):
-    content_type, content_string = contents.split(",")
-    decoded_text = b64decode(content_string).decode("utf-8")
-    try:
-        if "txt" in filename:
-            chat = decoded_text.splitlines()
-            chat = clearchat(chat)
-            df, df_system, df_media, df_links = build_df(chat)
-    except Exception as e:
-        print(e)
-        return html.Div([
-            'There was an error processing this file.'
-        ])
+def update_cards(click, contents, filename, first):
+    if first is not None:
+        raise PreventUpdate
+    else:
+        content_type, content_string = contents.split(",")
+        decoded_text = b64decode(content_string).decode("utf-8")
+        try:
+            if "txt" in filename:
+                chat = decoded_text.splitlines()
+                chat = clearchat(chat)
+                df, df_system, df_media, df_links = build_df(chat)
+        except Exception as e:
+            print(e)
+            return html.Div([
+                "There was an error processing this file."
+            ])
 
-    # total non-link non-media non-system messages
-    total_messages = len(df)
+        """ total non-link non-media non-system messages """
+        total_messages = len(df)
 
-    # total messages with links
-    total_links = len(df_links)
+        """ slow as fuck 6-7s
+        it"s actually total messages that have emojis (meaning a message like "👽👽👽👽😂👽" would only count as 1)
+        come back to this later, don"t forget to return the right thing """
+        emojilist = df["Content"].str.extract(
+            emoji.get_emoji_regexp()).dropna()
+        total_emojis = len(emojilist)
 
-    # total messages with media
-    total_media = len(df_media)
+        """total messages with links"""
+        total_links = len(df_links)
 
-    # all the people that have ever sent a message in this chat
-    total_chatters = len(df["Name"].unique())
+        """total messages with media"""
+        total_media = len(df_media)
 
-    # most used emoji in texsts
+        """all the people that have ever sent a message in this chat """
+        total_chatters = len(df["Name"].unique())
 
-    # person that sent the most messages
-    messages_per_chatter = df['Name'].value_counts()
-    most_messages_person = messages_per_chatter.index.tolist()[0]
-    messages_per_chatter = messages_per_chatter.to_frame()
+        """ most used emoji in texts """
+        most_used_emoji = "no"
 
-    # day that had most activity
-    messages_per_day = df['Date'].value_counts()
-    most_messages_day = messages_per_day.index.tolist()[0]
-    messages_per_day = messages_per_day.to_frame()
+        """ person that sent the most messages """
+        messages_per_chatter = df["Name"].value_counts()
+        most_messages_person = messages_per_chatter.idxmax()
+        messages_per_chatter = messages_per_chatter.rename_axis(
+            "Name").reset_index(name="Messages")
 
-    # figure = px.line(df_c, x=
-    # slow as fuck 6-7s
-    # it's actually total messages that have emojis (meaning a message like "👽👽👽👽😂👽" would only count as 1)
-    # come back to this later, don't forget to return the right thing
-    # emojilist = df_c["Content"].str.extract(emoji.get_emoji_regexp()).dropna()
+        """ day that had most activity """
+        messages_per_day = df["Date"].value_counts(sort=False)
+        most_messages_day = messages_per_day.idxmax()
 
-    # line chart with x
-    print(messages_per_chatter)
-    # pie chart with messages per sender
-    fig_piechart = px.pie(messages_per_chatter, values="",
-                          names="Names", title="Messages per Sender")
-    fig_piechart.update_layout(
-        plot_bgcolor='rgba(0, 0, 0, 0)', paper_bgcolor='rgba(0, 0, 0, 0)', title_x=0.5, margin=dict(l=20, r=20, t=30, b=20))
-    fig_piechart.update_xaxes(visible=False)
-    fig_piechart.update_yaxes(visible=False)
+        """ line chart with x """
+        fig_linechart = px.line(df, x="Date", markers=True,
+                                title="Daily progression of Messages")
+        fig_linechart.update_layout(font_color="white",
+                                    plot_bgcolor="rgba(0, 0, 0, 0)", paper_bgcolor="rgba(0, 0, 0, 0)", title_x=0.5, margin=dict(l=20, r=20, t=30, b=20),  yaxis_title="Messages")
+        fig_linechart.update_xaxes(visible=False)
 
-    # barchart with x
+        """ pie chart with messages per sender """
+        fig_piechart = px.pie(messages_per_chatter, values="Messages",
+                              names="Name", title="Messages per Sender")
+        fig_piechart.update_layout(font_color="white",
+                                   plot_bgcolor="rgba(0, 0, 0, 0)", paper_bgcolor="rgba(0, 0, 0, 0)", title_x=0.5, margin=dict(l=20, r=20, t=30, b=20))
+        fig_piechart.update_xaxes(visible=False)
+        fig_piechart.update_yaxes(visible=False)
 
-    # wordcloud with messages
-    wordcloud = WordCloud(background_color="rgb(48,48,48)", min_word_length=4, width=800, height=400).generate(
-        " ".join(df["Content"].astype(str)))
-    fig_wordcloud = px.imshow(
-        wordcloud, template="plotly_dark", title="Messages Wordcloud")
-    fig_wordcloud.update_layout(
-        plot_bgcolor='rgba(0, 0, 0, 0)', paper_bgcolor='rgba(0, 0, 0, 0)', title_x=0.5, margin=dict(l=20, r=20, t=30, b=20))
-    fig_wordcloud.update_xaxes(visible=False)
-    fig_wordcloud.update_yaxes(visible=False)
+        """ barchart with days """
+        # fig_barchart = px.bar(messages_per_day, y="Value",
+        #                       x="Name", title="Messages per Day")
+        # fig_barchart.update_layout(font_color="white",
+        #                            plot_bgcolor="rgba(0, 0, 0, 0)", paper_bgcolor="rgba(0, 0, 0, 0)", title_x=0.5, margin=dict(l=20, r=20, t=30, b=20))
+        # fig_barchart.update_xaxes(visible=False)
+        # fig_barchart.update_yaxes(visible=False)
+        fig_barchart = 1
 
-    visibility = {"display": "block"}
-    df = df.to_json()
-    return visibility, total_messages, 1, total_links, total_media, total_chatters, 1, most_messages_person, most_messages_day, 1, fig_piechart, 1, fig_wordcloud, df
-    # return visibility, total_messages, total_emojis, total_links, total_media, total_chatters, most_used_emoji, most_messages_person, most_messages_day, fig_linechart, fig_piechart, fig_barchart, fig_wordcloud, dataframe
+        """ wordcloud with messages """
+        wordcloud = WordCloud(background_color="rgb(48,48,48)", min_word_length=4, width=800, height=400).generate(
+            " ".join(df["Content"].astype(str)))
+        fig_wordcloud = px.imshow(
+            wordcloud, template="plotly_dark", title="Messages Wordcloud")
+        fig_wordcloud.update_layout(
+            plot_bgcolor="rgba(0, 0, 0, 0)", paper_bgcolor="rgba(0, 0, 0, 0)", title_x=0.5, margin=dict(l=20, r=20, t=30, b=20))
+        fig_wordcloud.update_xaxes(visible=False)
+        fig_wordcloud.update_yaxes(visible=False)
+
+        visibility = {"display": "block"}
+        df = df.to_json()
+
+        return visibility, total_messages, total_emojis, total_links, total_media, total_chatters, most_used_emoji, most_messages_person, most_messages_day, fig_linechart, fig_piechart, fig_barchart, fig_wordcloud, df
 
 
 @app.callback(Output("query-results", "style"), Output("query-results", "children"),  Input("submit-val", "n_clicks"), State("queryword", "value"), State("dataframe", "data"))
 def update_query(click, queryword, df):
     visibility = {"display": "none"}
-    if queryword is not None:
+    if (queryword is not None) and (queryword != ""):
         df = pd.read_json(df)
+        df["Date"] = df["Date"].dt.strftime("%Y/%m/%d")
         df_query = pd.DataFrame(columns=df.columns)
-        rows = df[df["Content"].astype(str).str.contains(
-            f"{queryword}|{queryword.upper()}")]
+        rows = df[df["Content"].astype(
+            str).str.contains(queryword, case=False)]
         df_query = df_query.append(rows, ignore_index=True)
         visibility = {"display": "block"}
         table = [html.Hr(), html.H2("Query Results"),
                  dash_table.DataTable(
-            id='table',
+            id="table",
             columns=[{"name": i, "id": i} for i in df_query.columns],
-            page_size=20,
-            data=df_query.to_dict('records'),
+            page_size=10,
+            data=df_query.to_dict("records"),
             style_as_list_view=True,
-            style_header={'backgroundColor': 'rgb(30, 30, 30)'},
+            style_header={"backgroundColor": "rgb(30, 30, 30)"},
             style_cell={
-                'backgroundColor': 'rgb(50, 50, 50)',
-                'color': 'white',
-                'textAlign': 'left'
+                "backgroundColor": "rgb(50, 50, 50)",
+                "color": "white",
+                "textAlign": "left",
+                "overflow": "hidden",
+                "textOverflow": "ellipsis",
+                "maxWidth": "400px"
+            },
+            style_data={
+                "whiteSpace": "normal",
+                "height": "auto",
             }
         )]
 
         return visibility, table
-    return visibility
+    return visibility, 1
 
 
 if __name__ == "__main__":
