@@ -408,7 +408,6 @@ def update_query(click, queryword, df):
                 "height": "auto",
             }
         )]
-
         return visibility, table
     return visibility, 1
 
