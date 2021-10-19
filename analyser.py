@@ -50,6 +50,8 @@ def build_df(chat):
 
     df = pd.DataFrame(list(zip(date_list, time, name, content)),
                       columns=["Date", "Time", "Name", "Content"])
+    df = df[~df["Content"].str.contains("This message was deleted")]
+    df = df[~df["Content"].str.contains("You deleted this message")]
 
     df_system = pd.DataFrame(columns=df.columns)
     cond = df["Name"] == "System Message"
@@ -252,6 +254,8 @@ app.layout = dbc.Container(fluid=True, children=[
 
 ])
 
+globalcontents = 0
+
 
 @ app.callback(
     Output("cards-and-graphs", "style"),
@@ -270,13 +274,14 @@ app.layout = dbc.Container(fluid=True, children=[
     Output("dataframe", "data"),
     Input("submit-val", "n_clicks"),
     State("upload-chat", "contents"),
-    State("upload-chat", "filename"),
-    State("total-messages", "children")
+    State("upload-chat", "filename")
 )
-def update_cards(click, contents, filename, first):
-    if first is not None:
+def update_cards(click, contents, filename):
+    global globalcontents
+    if contents == globalcontents:
         raise PreventUpdate
     else:
+        globalcontents = contents
         content_type, content_string = contents.split(",")
         decoded_text = b64decode(content_string).decode("utf-8")
         try:
