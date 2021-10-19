@@ -3,10 +3,7 @@ from datetime import date
 from base64 import b64decode, b64encode
 import dash
 from dash.exceptions import PreventUpdate
-from dash.html.Div import Div
-import diskcache
 from dash import dcc, html, dash_table
-from dash.long_callback import DiskcacheLongCallbackManager
 from dash.dependencies import Output, Input, State
 import dash_bootstrap_components as dbc
 import plotly.express as px
@@ -296,11 +293,12 @@ def update_cards(click, contents, filename, first):
         """ total non-link non-media non-system messages """
         total_messages = len(df)
 
-        """ slow as fuck 6-7s
-        it"s actually total messages that have emojis (meaning a message like "👽👽👽👽😂👽" would only count as 1)
-        come back to this later, don"t forget to return the right thing """
-        emojilist = df["Content"].str.extract(
+        """ all emojis sent """
+        emojilist = df["Content"].str.extractall(
             emoji.get_emoji_regexp()).dropna()
+        emojilist.reset_index(drop=True, inplace=True)
+
+        """ total number of emojis sent """
         total_emojis = len(emojilist)
 
         """total messages with links"""
@@ -313,7 +311,15 @@ def update_cards(click, contents, filename, first):
         total_chatters = len(df["Name"].unique())
 
         """ most used emoji in texts """
-        most_used_emoji = "no"
+        emojilist = emojilist.value_counts()
+        most_used_emoji = emojilist.idxmax()
+        emojilist = emojilist.reset_index(
+            name="Value")
+        emojilist = emojilist.rename(columns={emojilist.columns[0]: "Emoji"})
+        emojilist = emojilist.head(15)
+
+        # emojilist = emojilist.rename(
+        #     columns={emojilist.columns[0]: "Emoji", emojilist.columns[1]: "Value"}, inplace=True)
 
         """ person that sent the most messages """
         messages_per_chatter = df["Name"].value_counts()
@@ -325,9 +331,11 @@ def update_cards(click, contents, filename, first):
         messages_per_day = df["Date"].value_counts(sort=False)
         most_messages_day = messages_per_day.idxmax()
 
-        """ line chart with x """
+        """ line chart with total cumulative messages """
+        df.index.rename("Messages")
         fig_linechart = px.line(df, x="Date", markers=True,
                                 title="Daily progression of Messages")
+        fig_linechart.update_traces(line_color="#00BC8C", fill='tozeroy')
         fig_linechart.update_layout(font_color="white",
                                     plot_bgcolor="rgba(0, 0, 0, 0)", paper_bgcolor="rgba(0, 0, 0, 0)", title_x=0.5, margin=dict(l=20, r=20, t=30, b=20),  yaxis_title="Messages")
         fig_linechart.update_xaxes(visible=False)
@@ -340,14 +348,12 @@ def update_cards(click, contents, filename, first):
         fig_piechart.update_xaxes(visible=False)
         fig_piechart.update_yaxes(visible=False)
 
-        """ barchart with days """
-        # fig_barchart = px.bar(messages_per_day, y="Value",
-        #                       x="Name", title="Messages per Day")
-        # fig_barchart.update_layout(font_color="white",
-        #                            plot_bgcolor="rgba(0, 0, 0, 0)", paper_bgcolor="rgba(0, 0, 0, 0)", title_x=0.5, margin=dict(l=20, r=20, t=30, b=20))
-        # fig_barchart.update_xaxes(visible=False)
-        # fig_barchart.update_yaxes(visible=False)
-        fig_barchart = 1
+        """ barchart with most frequent emojis """
+        fig_barchart = px.bar(emojilist, x="Emoji",
+                              y="Value", title="Most used Emojis")
+        fig_barchart.update_traces(marker_color="#00BC8C")
+        fig_barchart.update_layout(font_color="white",
+                                   plot_bgcolor="rgba(0, 0, 0, 0)", paper_bgcolor="rgba(0, 0, 0, 0)", title_x=0.5, margin=dict(l=20, r=20, t=30, b=20))
 
         """ wordcloud with messages """
         wordcloud = WordCloud(background_color="rgb(48,48,48)", min_word_length=4, width=800, height=400).generate(
@@ -365,7 +371,7 @@ def update_cards(click, contents, filename, first):
         return visibility, total_messages, total_emojis, total_links, total_media, total_chatters, most_used_emoji, most_messages_person, most_messages_day, fig_linechart, fig_piechart, fig_barchart, fig_wordcloud, df
 
 
-@app.callback(Output("query-results", "style"), Output("query-results", "children"),  Input("submit-val", "n_clicks"), State("queryword", "value"), State("dataframe", "data"))
+@ app.callback(Output("query-results", "style"), Output("query-results", "children"),  Input("submit-val", "n_clicks"), State("queryword", "value"), State("dataframe", "data"))
 def update_query(click, queryword, df):
     visibility = {"display": "none"}
     if (queryword is not None) and (queryword != ""):
@@ -403,4 +409,4 @@ def update_query(click, queryword, df):
 
 
 if __name__ == "__main__":
-    app.run_server(debug=True)
+    app.run_server(debug=False)
