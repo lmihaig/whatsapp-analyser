@@ -1,19 +1,18 @@
 import re
-from datetime import date
-from base64 import b64decode, b64encode
+import pandas as pd
 import dash
+import plotly.express as px
+import dash_bootstrap_components as dbc
+import emoji
+from base64 import b64decode
 from dash.exceptions import PreventUpdate
 from dash import dcc, html, dash_table
 from dash.dependencies import Output, Input, State
-import dash_bootstrap_components as dbc
-import plotly.express as px
-import pandas as pd
 from wordcloud import WordCloud
-import emoji
 
 
 def clearchat(chat):
-    """combines multi-line messages without a proper date-time in a single message"""
+    # combines multi-line messages without a proper date-time in a single message#
     date_time_pattern = re.compile("^[0-3][0-9]\/[0-1][0-9]\/\d{4},")
     for i in range(len(chat)):
         if date_time_pattern.search(chat[i]) is None:
@@ -66,7 +65,7 @@ def build_df(chat):
     df.drop(rows.index, inplace=True)
 
     df_links = pd.DataFrame(columns=df.columns)
-    """ sorry if someone was having a discussion about https or http """
+    #  sorry if someone was having a discussion about https or http #
     rows = df[df["Content"].astype(str).str.contains("https|http")]
     df_links = df_links.append(rows, ignore_index=True)
     df.drop(rows.index, inplace=True)
@@ -75,7 +74,7 @@ def build_df(chat):
     return df, df_system, df_media, df_links
 
 
-""" still deciding on DARKLY, SLATE, SUPERHERO """
+#  still deciding on DARKLY, SLATE, SUPERHERO #
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY], meta_tags=[
     {"name": "viewport", "content": "width=device-width, initial-scale=1.0"}])
 app.title = "WhatsApp Chat Analyser by lmihaig"
@@ -295,27 +294,27 @@ def update_cards(click, contents, filename):
                 "There was an error processing this file."
             ])
 
-        """ total non-link non-media non-system messages """
+        #  total non-link non-media non-system messages #
         total_messages = len(df)
 
-        """ all emojis sent """
+        #  all emojis sent #
         emojilist = df["Content"].str.extractall(
             emoji.get_emoji_regexp()).dropna()
         emojilist.reset_index(drop=True, inplace=True)
 
-        """ total number of emojis sent """
+        #  total number of emojis sent #
         total_emojis = len(emojilist)
 
-        """total messages with links"""
+        # total messages with links#
         total_links = len(df_links)
 
-        """total messages with media"""
+        # total messages with media#
         total_media = len(df_media)
 
-        """all the people that have ever sent a message in this chat """
+        # all the people that have ever sent a message in this chat #
         total_chatters = len(df["Name"].unique())
 
-        """ most used emoji in texts """
+        #  most used emoji in texts #
         emojilist = emojilist.value_counts()
         most_used_emoji = emojilist.idxmax()
         emojilist = emojilist.reset_index(
@@ -323,20 +322,17 @@ def update_cards(click, contents, filename):
         emojilist = emojilist.rename(columns={emojilist.columns[0]: "Emoji"})
         emojilist = emojilist.head(15)
 
-        # emojilist = emojilist.rename(
-        #     columns={emojilist.columns[0]: "Emoji", emojilist.columns[1]: "Value"}, inplace=True)
-
-        """ person that sent the most messages """
+        #  person that sent the most messages #
         messages_per_chatter = df["Name"].value_counts()
         most_messages_person = messages_per_chatter.idxmax()
         messages_per_chatter = messages_per_chatter.rename_axis(
             "Name").reset_index(name="Messages")
 
-        """ day that had most activity """
+        #  day that had most activity #
         messages_per_day = df["Date"].value_counts(sort=False)
         most_messages_day = messages_per_day.idxmax()
 
-        """ line chart with total cumulative messages """
+        #  line chart with total cumulative messages #
         df.index.rename("Messages")
         fig_linechart = px.line(df, x="Date", markers=True,
                                 title="Daily progression of Messages")
@@ -345,7 +341,7 @@ def update_cards(click, contents, filename):
                                     plot_bgcolor="rgba(0, 0, 0, 0)", paper_bgcolor="rgba(0, 0, 0, 0)", title_x=0.5, margin=dict(l=20, r=20, t=30, b=20),  yaxis_title="Messages")
         fig_linechart.update_xaxes(visible=False)
 
-        """ pie chart with messages per sender """
+        #  pie chart with messages per sender #
         fig_piechart = px.pie(messages_per_chatter, values="Messages",
                               names="Name", title="Messages per Sender")
         fig_piechart.update_layout(font_color="white",
@@ -353,14 +349,14 @@ def update_cards(click, contents, filename):
         fig_piechart.update_xaxes(visible=False)
         fig_piechart.update_yaxes(visible=False)
 
-        """ barchart with most frequent emojis """
+        #  barchart with most frequent emojis #
         fig_barchart = px.bar(emojilist, x="Emoji",
                               y="Value", title="Most used Emojis")
         fig_barchart.update_traces(marker_color="#00BC8C")
         fig_barchart.update_layout(font_color="white",
                                    plot_bgcolor="rgba(0, 0, 0, 0)", paper_bgcolor="rgba(0, 0, 0, 0)", title_x=0.5, margin=dict(l=20, r=20, t=30, b=20))
 
-        """ wordcloud with messages """
+        #  wordcloud with messages #
         wordcloud = WordCloud(background_color="rgb(48,48,48)", min_word_length=4, width=800, height=400).generate(
             " ".join(df["Content"].astype(str)))
         fig_wordcloud = px.imshow(
