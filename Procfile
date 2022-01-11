@@ -1,1 +1,1 @@
-web: python3 analyser.py
+web: python analyser.py

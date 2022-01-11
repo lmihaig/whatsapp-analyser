@@ -124,7 +124,7 @@ app.layout = dbc.Container(fluid=True, children=[
             dbc.Input(id="queryword", placeholder="Word to search for"),
         ]),
         dbc.Col([
-            dbc.Button("Analyse", id="submit-val", n_clicks=0, block=True,
+            dbc.Button("Analyse", id="submit-val", n_clicks=0,
                        style={
                            "color":  "#00BC8C",
                            "border-style": "solid",
