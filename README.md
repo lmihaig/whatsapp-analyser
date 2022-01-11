@@ -6,3 +6,5 @@ Settings -> Chats -> Chat history -> Export chat (without media)
 
 Make sure your chat archives are exported in the following format:
 18/05/2019, 14:10 - Name: message
+
+## **Now available on Heroku https://lmg-whatsapp-analyser.herokuapp.com/**
