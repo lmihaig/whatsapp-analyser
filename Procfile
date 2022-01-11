@@ -1,1 +1,1 @@
-web: python analyser.py
+web: gunicorn analyser:server
